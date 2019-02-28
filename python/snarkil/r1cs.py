@@ -105,7 +105,11 @@ class State(object):
 	def lc_create(self, lc, idx=None):
 		if idx is None:
 			idx = self._random_idx()
-		assert isinstance(lc, Combination)
+		if isinstance(lc, Term):
+			# Upgrade a Term to a Linear Combination
+			lc = Combination(lc)
+		if not isinstance(lc, Combination):
+			raise TypeError('Expected Combination, got %r' % (type(lc),))
 		if idx in self._vars:
 			raise RuntimeError("Cannot create duplicate index")
 		if idx in self._lcs:
@@ -152,7 +156,8 @@ class Term(object):
 			coeff = FQ(1)			
 		elif isinstance(coeff, int_types):
 			coeff = FQ(coeff)
-		assert isinstance(coeff, FQ)
+		if not isinstance(coeff, FQ):
+			raise TypeError('Coefficient expected to be field element, but got %r' % (type(coeff),))
 		self.coeff = coeff
 
 	def __mul__(self, other):

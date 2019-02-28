@@ -23,17 +23,18 @@ class Program(object):
 		self.outputs = list()
 
 	@classmethod
-	def parse_inputs(cls, handle):
+	def parse_inputs(cls, handle, base=10):
 		"""
 		Given a file handle containing a mapping of variables to values
 		return an ordered dictionary
 		"""
 		result = OrderedDict()
 		for line in handle:
-			idx, value = line.split('=')
-			base = 10
+			idx, value = [_.strip() for _ in line.split('=')]
 			if value.startswith('0x'):
 				base = 16
+			elif value.startswith('0b'):
+				base = 2
 			value = int(value, base)
 			result[idx] = value
 		return result

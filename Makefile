@@ -35,5 +35,6 @@ test-parser:
 	@for circuit_file in tests/circuits/*.circuit; do \
 		echo "# Parsing $$circuit_file"; \
 		PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.parser $$circuit_file; \
+		PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.program $$circuit_file `echo $$circuit_file | cut -f 1 -d '.'`.input; \
 		echo ""; \
 	done

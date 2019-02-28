@@ -1,6 +1,8 @@
 import operator
 from functools import reduce
 
+from ethsnarks.field import FQ
+
 from .r1cs import State, Constraint
 from .parser import AbstractStatement, TableStatement, GenericStatement, ConstMulStatement, Line
 
@@ -356,11 +358,13 @@ class TableCommand(AbstractCommand):
         if len(stmt.lut) != lut_n_expected:
             raise InvalidCommandError("Lookup table count mismatch, expected %d, got %d" % (lut_n_expected, len(lut)), stmt, line)
 
-        return cls(stmt.lut, stmt.in_vars, stmt.out_vars)
+        lut = [FQ(int(_)) for _ in stmt.lut]
+
+        return cls(lut, stmt.in_vars, stmt.out_vars)
 
     def __init__(self, lut, in_vars, out_vars):
         self.lut = lut
-        super(TableOperation, self).__init__(in_vars, out_vars)
+        super(TableCommand, self).__init__(in_vars, out_vars)
 
     def setup(self, state):
         state.var_new(self.outputs[0])
@@ -368,13 +372,13 @@ class TableCommand(AbstractCommand):
     def evaluate(self, state):
         idx = 0
         for i, var_idx in enumerate(self.inputs):
-            value = state.value(var_idx)
+            value = int(state.value(var_idx))
             if value not in [0, 1]:
                 raise RuntimeError("Variable %d expected to be binary" % (var_idx,))
             idx += ((2**i) * value)
         assert idx < len(self.lut)
         result = self.lut[idx]
-        state.value(var_value_set, result)
+        state.var_value_set(self.outputs[0], result)
 
 
 COMMANDS = {
