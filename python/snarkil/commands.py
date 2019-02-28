@@ -89,9 +89,11 @@ class AbstractBinaryCommand(AbstractCommand):
         state.var_new(self.outputs[0])
 
     def evaluate(self, state):
-        val_A = int(state.value(self.inputs[0]))
-        val_B = int(state.value(self.inputs[1]))
-        result = self.op(val_A, val_B)
+        vals = [int(state.value(_)) for _ in self.inputs]
+        for idx, val in zip(self.inputs, vals):
+            if val not in [0, 1]:
+                raise RuntimeError('Argument %r not binary' % (idx,))
+        result = self.op(*vals)
         state.var_value_set(self.outputs[0], result)
 
 
@@ -134,17 +136,16 @@ class AddCommand(AbstractCommand):
 
     @classmethod
     def from_statement(cls, stmt, line):
-        if len(stmt.in_vars) > 0:
-            raise InvalidCommandError('Requires at least 1 input', stmt, line)
+        if len(stmt.in_vars) < 2:
+            raise InvalidCommandError('Requires at least 2 inputs', stmt, line)
         if len(stmt.out_vars) != 1:
             raise InvalidCommandError('Requires 1 output', stmt, line)
         return cls(stmt.in_vars, stmt.out_vars)
 
     def setup(self, state):
-        state.lc_create(self.lc_result, self.outputs[0])
+        state.lc_create(self.lc_result(state), self.outputs[0])
 
-    @property
-    def lc_result(self):
+    def lc_result(self, state):
         return reduce(operator.add, [state[_] for _ in self.inputs])
 
     def evaluate(self, state):
