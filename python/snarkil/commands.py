@@ -30,6 +30,9 @@ class AbstractCommand(object):
         self.outputs = outputs
         self.aux = aux
 
+    def as_statement(self):
+        raise NotImplementedError()
+
     @classmethod
     def from_statement(self, stmt, line=None):
         """
@@ -63,6 +66,9 @@ class AbstractCommand(object):
 class AbstractBinaryCommand(AbstractCommand):
     __slots__ = ('op',)
 
+    def as_statement(self):
+        return GenericStatement(self.term, self.inputs, self.outputs)
+
     @classmethod
     def from_statement(cls, stmt, line):
         ops = {
@@ -78,6 +84,10 @@ class AbstractBinaryCommand(AbstractCommand):
             raise InvalidCommandError('Requires 1 output', stmt, line)
         input_A, input_B = stmt.in_vars
         return cls(ops[stmt.term], stmt.in_vars, stmt.out_vars)
+
+    @property
+    def term(self):
+        raise NotImplementedError()
 
     def __init__(self, op, inputs, outputs):
         self.op = op
@@ -101,6 +111,9 @@ class XorBinaryCommand(AbstractBinaryCommand):
     """
     https://github.com/akosba/jsnark/blob/master/JsnarkCircuitBuilder/src/circuit/operations/primitive/XorBasicOp.java
     """
+    @property
+    def term(self):
+        return 'xor'
 
     def constraints(self, state):
         a = state[self.inputs[0]] * 2
@@ -110,6 +123,10 @@ class XorBinaryCommand(AbstractBinaryCommand):
 
 
 class AndBinaryCommand(AbstractBinaryCommand):
+    @property
+    def term(self):
+        return 'and'
+
     def constraints(self, state):
         a = state[self.inputs[0]]
         b = state[self.inputs[1]]
@@ -122,6 +139,10 @@ class OrBinaryCommand(AbstractBinaryCommand):
     https://github.com/akosba/jsnark/blob/master/JsnarkCircuitBuilder/src/circuit/operations/primitive/ORBasicOp.java
     """
 
+    @property
+    def term(self):
+        return 'or'
+
     def constraints(self, state):
         a = state[self.inputs[0]]
         b = state[self.inputs[1]]
@@ -133,6 +154,9 @@ class AddCommand(AbstractCommand):
     """
     https://github.com/akosba/jsnark/blob/master/JsnarkCircuitBuilder/src/circuit/operations/primitive/AddBasicOp.java
     """
+
+    def as_statement(self):
+        return GenericStatement('add', self.inputs, self.outputs)
 
     @classmethod
     def from_statement(cls, stmt, line):
@@ -158,13 +182,24 @@ class AddCommand(AbstractCommand):
 
 
 class SubCommand(AddCommand):
+    def as_statement(self):
+        return GenericStatement('sub', self.inputs, self.outputs)
+
     @property
     def lc_result(self):
         return reduce(operator.sub, [state[_] for _ in self.inputs])
 
 
 class ConstMulCommand(AbstractCommand):
-    __slots__ = ('value',)
+    __slots__ = ('value', 'is_negative')
+
+    def as_statement(self):
+        value = self.value
+        term = 'const-mul'
+        if self.is_negative:
+            term = term + '-neg'
+            value = -value
+        return ConstMulStatement(value, term, self.inputs, self.outputs)
 
     @classmethod
     def from_statement(cls, stmt, line):
@@ -181,10 +216,11 @@ class ConstMulCommand(AbstractCommand):
         if stmt.is_negative:
             value = -value
 
-        return cls(stmt.in_vars, stmt.out_vars, value)
+        return cls(stmt.in_vars, stmt.out_vars, value, stmt.is_negative)
 
-    def __init__(self, inputs, outputs, value):
+    def __init__(self, inputs, outputs, value, is_negative):
         self.value = value
+        self.is_negative = is_negative
         super(ConstMulCommand, self).__init__(inputs, outputs)
 
     def setup(self, state):
@@ -204,6 +240,9 @@ class NonZeroCheckCommand(AbstractCommand):
     """
     https://github.com/akosba/jsnark/blob/master/JsnarkCircuitBuilder/src/circuit/operations/primitive/NonZeroCheckBasicOp.java
     """
+
+    def as_statement(self):
+        return GenericStatement('zerop', self.inputs, self.outputs)
 
     @classmethod
     def from_statement(cls, stmt, line):
@@ -235,6 +274,9 @@ class AssertCommand(AbstractCommand):
     https://github.com/akosba/jsnark/blob/master/JsnarkCircuitBuilder/src/circuit/operations/primitive/AssertBasicOp.java
     """
 
+    def as_statement(self):
+        return GenericStatement('assert', self.inputs, self.outputs)
+
     @classmethod
     def from_statement(cls, stmt, line):
         if len(stmt.out_vars) != 1:
@@ -258,6 +300,9 @@ class PackCommand(AbstractCommand):
     """
     https://github.com/akosba/jsnark/blob/master/JsnarkCircuitBuilder/src/circuit/operations/primitive/PackBasicOp.java
     """
+
+    def as_statement(self):
+        return GenericStatement('pack', self.inputs, self.outputs)
 
     @classmethod
     def from_statement(cls, stmt, line):
@@ -289,6 +334,9 @@ class SplitCommand(AbstractCommand):
     https://github.com/akosba/jsnark/blob/master/JsnarkCircuitBuilder/src/circuit/operations/primitive/SplitBasicOp.java
     """
 
+    def as_statement(self):
+        return GenericStatement('split', self.inputs, self.outputs)
+
     @classmethod
     def from_statement(cls, stmt, line):
         if len(stmt.in_vars) != 1:
@@ -315,6 +363,9 @@ class MulCommand(AbstractCommand):
     """
     https://github.com/akosba/jsnark/blob/master/JsnarkCircuitBuilder/src/circuit/operations/primitive/MulBasicOp.java
     """
+
+    def as_statement(self):
+        return GenericStatement('mul', self.inputs, self.outputs)
 
     @classmethod
     def from_statement(cls, stmt, line):
@@ -345,6 +396,9 @@ class MulCommand(AbstractCommand):
 
 class TableCommand(AbstractCommand):
     __slots__ = ('lut',)
+
+    def as_statement(self):
+        return TableStatement(self.lut, self.inputs, self.outputs)
 
     @classmethod
     def from_statement(cls, stmt, line):
