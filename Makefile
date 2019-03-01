@@ -3,10 +3,10 @@ CLI = .build/il-pinocchio
 PYTHON=python3
 PYTHONPATH=ethsnarks/:python/
 
-CIRCUIT_TESTS_DIR=tests/circuits/
+CIRCUIT_TESTS_DIR=tests/circuits
 CIRCUIT_TESTS=$(wildcard $(CIRCUIT_TESTS_DIR)/*.circuit)
 
-all: $(CLI)
+all: $(CLI) test-circuits
 
 $(CLI): .build
 	$(MAKE) -C $(dir $@)
@@ -31,7 +31,7 @@ git-pull:
 	git pull --recurse-submodules
 	git submodule update --recursive --remote
 
-clean: pinocchio-clean
+clean: test-circuits-clean
 	rm -rf .build
 
 test-parser:
@@ -42,12 +42,17 @@ test-parser:
 		echo ""; \
 	done
 
+test-circuits: $(addsuffix .result-cxx, $(basename $(CIRCUIT_TESTS))) $(addsuffix .result-py, $(basename $(CIRCUIT_TESTS)))
 
-pinocchio-test: $(addsuffix .result, $(basename $(CIRCUIT_TESTS)))
+test-circuits-clean:
+	rm -f $(CIRCUIT_TESTS_DIR)/*.result $(CIRCUIT_TESTS_DIR)/*.result-*
 
-pinocchio-clean:
-	rm -f $(CIRCUIT_TESTS_DIR)/*.result
+# Perform circuit file tests using Python implementation
+$(CIRCUIT_TESTS_DIR)/%.result-py: $(CIRCUIT_TESTS_DIR)/%.circuit $(CIRCUIT_TESTS_DIR)/%.test $(CIRCUIT_TESTS_DIR)/%.input
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.program $< $(basename $<).input > $@
+	diff -ru $(basename $<).test $@ || rm $@
 
-$(CIRCUIT_TESTS_DIR)/%.result: $(CIRCUIT_TESTS_DIR)/%.circuit $(CIRCUIT_TESTS_DIR)/%.test $(CIRCUIT_TESTS_DIR)/%.input $(CLI)
+# Perform circuit file tests using C++ implementation
+$(CIRCUIT_TESTS_DIR)/%.result-cxx: $(CIRCUIT_TESTS_DIR)/%.circuit $(CIRCUIT_TESTS_DIR)/%.test $(CIRCUIT_TESTS_DIR)/%.input $(CLI)
 	$(CLI) $< eval $(basename $<).input > $@
 	diff -ru $(basename $<).test $@ || rm $@

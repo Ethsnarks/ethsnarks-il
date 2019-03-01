@@ -726,14 +726,6 @@ void CircuitReader::addNonzeroCheckConstraint(const InputWires& inputs, const Ou
 
 	auto& M = varGet(outputs[0], FMT("zerop aux", " (X=%zu,M=%zu)", inputs[0], outputs[0]));
 
-	/*
-	VariableT M;
-	M.allocate(this->pb, FMT("zerop aux", " (X=%zu,M=%zu)", inputs[0], outputs[0]));
-	*/
-
-	// XXX: unnecessary?
-	generate_boolean_r1cs_constraint<FieldT>(pb, Y);
-
 	pb.add_r1cs_constraint(ConstraintT(X, 1 - LinearCombinationT(Y), 0), "X is 0, or Y is 1");
 
 	pb.add_r1cs_constraint(ConstraintT(X, M, Y), "X * (1/X) = Y");

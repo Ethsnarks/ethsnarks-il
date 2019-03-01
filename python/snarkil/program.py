@@ -23,7 +23,7 @@ class Program(object):
 		self.outputs = list()
 
 	@classmethod
-	def parse_inputs(cls, handle, base=10):
+	def parse_inputs(cls, handle, base=16):
 		"""
 		Given a file handle containing a mapping of variables to values
 		return an ordered dictionary
