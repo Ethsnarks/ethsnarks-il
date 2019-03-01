@@ -68,7 +68,22 @@ class Program(object):
 		for cmd in self.commands:
 			cmd.setup(self.state)
 
-	def run(self, inputs=None, secrets=None):
+	def trace(self):
+		for cmd in self.commands:
+			cmd.evaluate(self.state)
+			# Then display the command, and all inputs/outputs/auxvars
+			stmt = cmd.as_statement()
+			print(stmt.as_line())
+			for idx, val in [(_, self.state.value(_)) for _ in cmd.inputs]:
+				print("\tin", idx, "=", val)
+			for idx, val in [(_, self.state.value(_)) for _ in cmd.outputs]:
+				print("\tout", idx, "=", val)
+			if cmd.aux:
+				for idx, val in [(_, self.state.value(_)) for _ in cmd.aux]:
+					print("\taux", idx, "=", val)
+			print()
+
+	def run(self):
 		for cmd in self.commands:
 			cmd.evaluate(self.state)
 
@@ -98,20 +113,31 @@ class Program(object):
 
 def program_main(argv):
 	if len(argv) < 3:
-		print("Usage: %s <file.circuit> <file.input>" % (argv[0],))
+		print("Usage: %s <eval|trace> <file.circuit> <file.input>" % (argv[0],))
 		return 1
 
-	with open(argv[2], 'r') as input_handle:
+	cmd = argv[1]
+	ok_cmds = ['eval', 'trace']
+	if cmd not in ok_cmds:
+		print("Error: command must be one of:", ok_cmds)
+		return 2
+
+	with open(argv[3], 'r') as input_handle:
 		inputs = Program.parse_inputs(input_handle)
 
-	with open(argv[1], 'r') as circuit_handle:		
+	with open(argv[2], 'r') as circuit_handle:
 		program = Program.from_lines(circuit_handle)
 
 	program.setup()
 
 	program.set_values(inputs)
 
-	program.run()
+	if cmd == 'trace':
+		program.trace()
+	elif cmd == 'eval':
+		program.run()
+	else:
+		raise RuntimeError('Unknown mode!')
 
 	for idx in program.outputs:
 		value = program.value(idx)

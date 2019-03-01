@@ -34,6 +34,8 @@ git-pull:
 clean: test-circuits-clean
 	rm -rf .build
 
+test: test-circuits
+
 test-parser:
 	@for circuit_file in tests/circuits/*.circuit; do \
 		echo "# Parsing $$circuit_file"; \
@@ -49,7 +51,7 @@ test-circuits-clean:
 
 # Perform circuit file tests using Python implementation
 $(CIRCUIT_TESTS_DIR)/%.result-py: $(CIRCUIT_TESTS_DIR)/%.circuit $(CIRCUIT_TESTS_DIR)/%.test $(CIRCUIT_TESTS_DIR)/%.input
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.program $< $(basename $<).input > $@
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.program eval $< $(basename $<).input > $@
 	diff -ru $(basename $<).test $@ || rm $@
 
 # Perform circuit file tests using C++ implementation
