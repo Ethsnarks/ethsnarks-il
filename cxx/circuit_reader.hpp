@@ -48,12 +48,6 @@ enum Opcode {
 };
 
 
-struct ZeroEqualityItem {
-	Wire in_wire_id;
-	ethsnarks::VariableT aux_var;
-};
-
-
 class CircuitInstruction {
 public:
 	Opcode opcode;
@@ -99,8 +93,6 @@ public:
 
 protected:
 	std::map<Wire,VariableT> variableMap;
-
-	std::vector<ZeroEqualityItem> zerop_items;
 
 	std::vector<CircuitInstruction> instructions;
 

@@ -3,6 +3,9 @@ CLI = .build/il-pinocchio
 PYTHON=python3
 PYTHONPATH=ethsnarks/:python/
 
+CIRCUIT_TESTS_DIR=tests/circuits/
+CIRCUIT_TESTS=$(wildcard $(CIRCUIT_TESTS_DIR)/*.circuit)
+
 all: $(CLI)
 
 $(CLI): .build
@@ -28,7 +31,7 @@ git-pull:
 	git pull --recurse-submodules
 	git submodule update --recursive --remote
 
-clean:
+clean: pinocchio-clean
 	rm -rf .build
 
 test-parser:
@@ -38,3 +41,13 @@ test-parser:
 		PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.program $$circuit_file `echo $$circuit_file | cut -f 1 -d '.'`.input; \
 		echo ""; \
 	done
+
+
+pinocchio-test: $(addsuffix .result, $(basename $(CIRCUIT_TESTS)))
+
+pinocchio-clean:
+	rm -f $(CIRCUIT_TESTS_DIR)/*.result
+
+$(CIRCUIT_TESTS_DIR)/%.result: $(CIRCUIT_TESTS_DIR)/%.circuit $(CIRCUIT_TESTS_DIR)/%.test $(CIRCUIT_TESTS_DIR)/%.input $(CLI)
+	$(CLI) $< eval $(basename $<).input > $@
+	diff -ru $(basename $<).test $@ || rm $@

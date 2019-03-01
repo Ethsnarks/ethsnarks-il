@@ -178,6 +178,7 @@ void CircuitReader::evalInstruction( const CircuitInstruction &inst )
 								FieldT::zero() : FieldT::one(), "or, A | B = C");
 	}
 	else if (opcode == ZEROP_OPCODE) {
+		varSet(outWires[0], inValues[0].inverse(), "zerop-aux");
 		varSet(outWires[1], (inValues[0] == FieldT::zero()) ? FieldT::zero() : FieldT::one(), "zerop");
 	}
 	else if (opcode == PACK_OPCODE) {
@@ -281,9 +282,10 @@ void CircuitReader::parseCircuit(const char* arithFilepath)
 			readIds(outputStr, outWires);
 			numGateOutputs = outWires.size();
 
-			if( (1u<<numGateInputs) != inWires.size() ) {
+			// Size of table must have enough input wires to select all the options
+			if( numGateInputs != (1<<inWires.size()) ) {
 				std::cerr << "Error parsing line: " << line << std::endl;
-				std::cerr << " input gate mismatch, expected " << (1u<<numGateInputs) << " got " << inWires.size() << std::endl;
+				std::cerr << " input gate mismatch, " << inWires.size() << " inputs require table of size " << (1<<inWires.size()) << std::endl;
 				exit(6);
 			}
 
@@ -293,7 +295,7 @@ void CircuitReader::parseCircuit(const char* arithFilepath)
 				exit(6);
 			}
 
-			if( numGateInputs <= 0 || numGateInputs > 3u ) {
+			if( numGateInputs <= 0 || numGateInputs > 16u ) {
 				std::cerr << "Error parsing line: " << line << std::endl;
 				std::cerr << " unsupported lookup table size: " << numGateInputs << std::endl;
 				exit(6);
@@ -718,20 +720,23 @@ void CircuitReader::addPackConstraint(const InputWires& inputs, const OutputWire
 */
 void CircuitReader::addNonzeroCheckConstraint(const InputWires& inputs, const OutputWires& outputs)
 {
-	auto& X = varGet(inputs[0], FMT("zerop input", " (%zu)", inputs[0]));
+	auto& X = varGet(inputs[0], FMT("zerop input", " (X=%zu)", inputs[0]));
 
-	auto& Y = varGet(outputs[0], FMT("zerop output", " (%zu)", outputs[0]));
+	auto& Y = varGet(outputs[1], FMT("zerop output", " (Y=%zu)", outputs[1]));
 
+	auto& M = varGet(outputs[0], FMT("zerop aux", " (X=%zu,M=%zu)", inputs[0], outputs[0]));
+
+	/*
 	VariableT M;
-	M.allocate(this->pb, FMT("zerop aux", " (%zu,%zu)", inputs[0], outputs[0]));
+	M.allocate(this->pb, FMT("zerop aux", " (X=%zu,M=%zu)", inputs[0], outputs[0]));
+	*/
 
+	// XXX: unnecessary?
 	generate_boolean_r1cs_constraint<FieldT>(pb, Y);
 
 	pb.add_r1cs_constraint(ConstraintT(X, 1 - LinearCombinationT(Y), 0), "X is 0, or Y is 1");
 
 	pb.add_r1cs_constraint(ConstraintT(X, M, Y), "X * (1/X) = Y");
-
-	zerop_items.push_back({inputs[0], M});
 }
 
 
