@@ -210,7 +210,7 @@ class Combination(object):
 		elif isinstance(other, (Variable, Term)):
 			if isinstance(other, Variable):
 				other = Term(other)
-			return Combination(self.terms + [other])
+			return Combination(*self.terms, other)
 		else:
 			raise TypeError('Unknown type for argument: ' + repr(other))
 
@@ -228,12 +228,30 @@ class Constraint(object):
 	Where each of A, B and C are linear combinations
 	"""
 	def __init__(self, alpha, bravo, charlie):
-		self.alpha = alpha
-		self.bravo = bravo
-		self.charlie = charlie
+		if isinstance(alpha, Variable):
+			alpha = Term(alpha)
+		if isinstance(bravo, Variable):
+			bravo = Term(bravo)
+		if isinstance(charlie, Variable):
+			charlie = Term(charlie)
+		if isinstance(alpha, Term):
+			alpha = Combination(alpha)
+		if isinstance(bravo, Term):
+			bravo = Combination(bravo)
+		if isinstance(charlie, Term):
+			charlie = Combination(charlie)
+		if not isinstance(alpha, Combination):
+			raise TypeError("A required to be LinearCombination, not %r" % (type(alpha),))
+		if not isinstance(bravo, Combination):
+			raise TypeError("B required to be LinearCombination, not %r" % (type(bravo),))
+		if not isinstance(charlie, Combination):
+			raise TypeError("C required to be LinearCombination, not %r" % (type(charlie),))
+		self.a = alpha
+		self.b = bravo
+		self.c = charlie
 
 	def valid(self, state):
-		a = self.alpha.evaluate(state)
-		b = self.bravo.evaluate(state)
-		c = self.charlie.evaluate(state)
+		a = self.a.evaluate(state)
+		b = self.b.evaluate(state)
+		c = self.c.evaluate(state)
 		return (a * b) == c

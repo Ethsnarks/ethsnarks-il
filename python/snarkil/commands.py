@@ -3,7 +3,7 @@ from functools import reduce
 
 from ethsnarks.field import FQ
 
-from .r1cs import State, Constraint
+from .r1cs import State, Constraint, Combination, Term
 from .parser import AbstractStatement, TableStatement, GenericStatement, ConstMulStatement, Line
 
 
@@ -118,8 +118,8 @@ class XorBinaryCommand(AbstractBinaryCommand):
     def constraints(self, state):
         a = state[self.inputs[0]] * 2
         b = state[self.inputs[1]]
-        c = (a + b) - state[self.outputs[0]]
-        return Constraint(a, b, c)
+        c = a + b - state[self.outputs[0]]
+        return [Constraint(a, b, c)]
 
 
 class AndBinaryCommand(AbstractBinaryCommand):
@@ -131,7 +131,7 @@ class AndBinaryCommand(AbstractBinaryCommand):
         a = state[self.inputs[0]]
         b = state[self.inputs[1]]
         c = state[self.outputs[0]]
-        return Constraint(a, b, c)
+        return [Constraint(a, b, c)]
 
 
 class OrBinaryCommand(AbstractBinaryCommand):
@@ -146,8 +146,8 @@ class OrBinaryCommand(AbstractBinaryCommand):
     def constraints(self, state):
         a = state[self.inputs[0]]
         b = state[self.inputs[1]]
-        c = (a + b) - state[self.outputs[0]]
-        return Constraint(a, b, c)
+        c = a + b - state[self.outputs[0]]
+        return [Constraint(a, b, c)]
 
 
 class AddCommand(AbstractCommand):
@@ -173,10 +173,10 @@ class AddCommand(AbstractCommand):
         return reduce(operator.add, [state[_] for _ in self.inputs])
 
     def evaluate(self, state):
-        # Evaluation unnecessary, everything is linear constraints        
+        # Evaluation unnecessary, everything is linear constraints
         pass
 
-    def constraints(self):
+    def constraints(self, state):
         # Evaluation unnecessary, everything is linear constraints
         pass
 
@@ -231,9 +231,9 @@ class ConstMulCommand(AbstractCommand):
         # Evaluation unnecessary, everything is linear constraints        
         pass
 
-    def constraints(self):
+    def constraints(self, state):
         # Evaluation unnecessary, everything is linear constraints
-        pass
+        return []
 
 
 class NonZeroCheckCommand(AbstractCommand):
@@ -259,7 +259,7 @@ class NonZeroCheckCommand(AbstractCommand):
             state.var_new(idx)
 
     def evaluate(self, state):
-        input_val = state.value(self.inputs[0])        
+        input_val = state.value(self.inputs[0])
 
         # Output value is 1 if input is non-zero, else 0
         result = 0 if input_val == 0 else 1
@@ -267,6 +267,21 @@ class NonZeroCheckCommand(AbstractCommand):
 
         # Intermediate value 'M'
         state.var_value_set(self.outputs[0], 1/input_val)
+
+    def constraints(self, state):
+        """
+        Disjunction gadget
+        When X is zero, Y will be zero
+        When X is non-zero, Y will be 1
+        """
+        X = state[self.inputs[0]]
+        M = state[self.outputs[0]]
+        Y = state[self.outputs[1]]
+        return [
+            #Constraint(Y, Y, Y),
+            Constraint(X, 1 - Y, 0),
+            Constraint(X, M, Y),
+        ]
 
 
 class AssertCommand(AbstractCommand):
@@ -295,6 +310,9 @@ class AssertCommand(AbstractCommand):
         if (a * b) != c:
             raise RuntimeError("Assertion failed!")
 
+    def constraints(self, state):
+        return [Constraint(a, b, c)]
+
 
 class PackCommand(AbstractCommand):
     """
@@ -318,15 +336,17 @@ class PackCommand(AbstractCommand):
         state.var_new(self.outputs[0])
 
     def evaluate(self, state):
-        powers = [2**_ for _ in range(1, len(self.inputs))]
-        summed = None
-        for i, p in enumerate(powers):
-            value_powered = state.value(self.inputs[i]) * p
-            if summed is None:
-                summed = value_powered
-            else:
-                summed += value_powered
-        state.var_value_set(self.outputs[0], summed)
+        result = self.lc_result(state).evaluate(state)
+        state.var_value_set(self.outputs[0], result)
+
+    def lc_result(self, state):
+        powers = [2**_ for _ in range(len(self.inputs))]
+        terms = [self.state[idx] * p
+                 for idx, p in zip(self.inputs, powers)]
+        return Combination(*terms)
+
+    def constraints(self, state):
+        return [Constraint(self.lc_result(state), 1, self.outputs[0])]
 
 
 class SplitCommand(AbstractCommand):
@@ -392,6 +412,22 @@ class MulCommand(AbstractCommand):
         for i, idx in enumerate(self.inputs[1:]):
             product = product * state.value(idx)
             state.var_value_set(outputs[i], product)
+
+    def constraints(self, state):
+        # [a b c d]
+        # a * b = x
+        # x * c = y
+        # y * d = z
+        outputs = self.aux + self.outputs
+        result = list()
+        it = iter(self.inputs)
+        a = state[next(it)]
+        for i, b in enumerate(it):
+            b = state[b]
+            out = state[outputs[i]]
+            result.append(Constraint(Term(a), Term(b), Term(out)))
+            a = state[outputs[i]]
+        return result
 
 
 class TableCommand(AbstractCommand):
