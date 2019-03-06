@@ -279,7 +279,7 @@ class NonZeroCheckCommand(AbstractCommand):
         Y = state[self.outputs[1]]
         return [
             #Constraint(Y, Y, Y),
-            Constraint(X, 1 - Y, 0),
+            Constraint(X, state.ONE - Y, state.ZERO),
             Constraint(X, M, Y),
         ]
 
@@ -415,9 +415,9 @@ class MulCommand(AbstractCommand):
 
     def constraints(self, state):
         # [a b c d]
-        # a * b = x
-        # x * c = y
-        # y * d = z
+        #   a * b = x
+        #   x * c = y
+        #   y * d = z
         outputs = self.aux + self.outputs
         result = list()
         it = iter(self.inputs)
@@ -449,9 +449,18 @@ class TableCommand(AbstractCommand):
         if len(stmt.lut) != lut_n_expected:
             raise InvalidCommandError("Lookup table count mismatch, expected %d, got %d" % (lut_n_expected, len(lut)), stmt, line)
 
-        lut = [FQ(int(_)) for _ in stmt.lut]
+        # Map number of input bits onto the classes which implement the constraints
+        table_classes = {
+            1: TableCommand1bit,
+            2: TableCommand2bit
+        }
+        n_bits = len(stmt.in_vars)
+        if n_bits not in table_classes:
+            raise InvalidCommandError('Unsupported table with %d bits' % (n_bits,), stmt, line)
+        sub_cls = table_classes[len(stmt.in_vars)]
 
-        return cls(lut, stmt.in_vars, stmt.out_vars)
+        lut = [FQ(int(_)) for _ in stmt.lut]
+        return sub_cls(lut, stmt.in_vars, stmt.out_vars)
 
     def __init__(self, lut, in_vars, out_vars):
         self.lut = lut
@@ -470,6 +479,33 @@ class TableCommand(AbstractCommand):
         assert idx < len(self.lut)
         result = self.lut[idx]
         state.var_value_set(self.outputs[0], result)
+
+
+class TableCommand1bit(TableCommand):
+    def constraints(self, state):
+        one = state.ONE
+        b = state[self.inputs[0]]  # input bit
+        r = state[self.outputs[0]] # result
+        a = state.constant(self.lut[0])
+
+        a += (b*self.lut[1])
+        a -= (b*self.lut[0])
+        return [Constraint(a, one, r)]
+
+
+class TableCommand2bit(TableCommand):
+    def constraints(self, state):
+        c = self.lut
+        b = [state[_] for _ in self.inputs]
+        r = state[self.outputs[0]]
+
+        # lhs = c[1] - c[0] + (b[1] * (c[3] - c[2] - c[1] + c[0]))
+        lhs = state.constant(c[1] - c[0]) + Term(b[1], c[3] - c[2] - c[1] + c[0])
+
+        # rhs = -c[0] + r + (b[1] * (-c[2] + c[0]))
+        rhs = state.constant(-c[0]) + r + Term(b[1], -c[2] + c[0])
+
+        return [Constraint(lhs, b[0], rhs)]
 
 
 COMMANDS = {

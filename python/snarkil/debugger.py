@@ -11,20 +11,20 @@ def eprint(*args, **kwargs):
 def print_constriant(constraint, state, prefix="\t"):
 	eprint(prefix, "A", constraint.a.title or '')
 	for term in constraint.a.terms:
-		eprint(prefix, "\t", term.var.idx, '*', term.coeff)
-		eprint(prefix, "\tvalue of ", term.var.idx, 'is', state.value(term.var), '(negative of', -state.value(term.var), ')')
+		eprint(prefix, "\t$%r * %r = %r" % (term.var.idx, term.coeff, term.evaluate(state)))
+		eprint(prefix, "\t\tvalue of %r is %r (negative of %r)" % (term.var.idx, state.value(term.var), -state.value(term.var)))
 	eprint()
 
 	eprint(prefix, "B", constraint.b.title or '')
 	for term in constraint.b.terms:
-		eprint(prefix, "\t", term.var.idx, '*', term.coeff)
-		eprint(prefix, "\tvalue of ", term.var.idx, 'is', state.value(term.var), '(negative of', -state.value(term.var), ')')
+		eprint(prefix, "\t$%r * %r = %r" % (term.var.idx, term.coeff, term.evaluate(state)))
+		eprint(prefix, "\t\tvalue of %r is %r (negative of %r)" % (term.var.idx, state.value(term.var), -state.value(term.var)))
 	eprint()
 
 	eprint(prefix, "C", constraint.c.title or '')
 	for term in constraint.c.terms:
-		eprint(prefix, "\t", term.var.idx, '*', term.coeff)
-		eprint(prefix, "\tvalue of ", term.var.idx, 'is', state.value(term.var), '(negative of', -state.value(term.var), ')')
+		eprint(prefix, "\t$%r * %r = %r" % (term.var.idx, term.coeff, term.evaluate(state)))
+		eprint(prefix, "\t\tvalue of %r is %r (negative of %r)" % (term.var.idx, state.value(term.var), -state.value(term.var)))
 	eprint()
 
 
@@ -40,12 +40,12 @@ class Debugger(object):
 		stmt = cmd.as_statement()
 		eprint(stmt.as_line())
 		for idx, val in [(_, state.value(_)) for _ in cmd.inputs]:
-			eprint("\tin", idx, "=", val)
+			eprint("\tin %r = %r" % (idx, val))
 		for idx, val in [(_, state.value(_)) for _ in cmd.outputs]:
-			eprint("\tout", idx, "=", val)
+			eprint("\tout %r = %r" % (idx, val))
 		if cmd.aux:
 			for idx, val in [(_, state.value(_)) for _ in cmd.aux]:
-				eprint("\taux", idx, "=", val)
+				eprint("\taux %r = %r" % (idx, val))
 
 		constraints = cmd.constraints(state)
 		if constraints:

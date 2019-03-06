@@ -3,6 +3,7 @@ from copy import copy
 from os import urandom
 from binascii import hexlify
 from functools import reduce
+from collections import OrderedDict
 from ethsnarks.field import FQ, int_types
 
 
@@ -34,9 +35,21 @@ class State(object):
 
 		If a linear combination or variable is unused by any constraints then it has no purpose.
 		"""
-		self._vars = dict()
+		self._vars = OrderedDict()
 		self._lcs = dict()
 		self._values = dict()
+		self.var_new('ONE', value=FQ(1))
+
+	def constant(self, value):
+		return self.ONE * value
+
+	@property
+	def ONE(self):
+		return self._vars['ONE']
+
+	@property
+	def ZERO(self):
+		return Term(self.ONE, 0)
 
 	def __getitem__(self, idx):
 		if isinstance(idx, Variable):
@@ -199,7 +212,7 @@ class Combination(object):
 		if isinstance(thing, Term):
 			thing = cls(thing)
 		if not isinstance(thing, cls):
-			raise TypeError("Thign is required to be %r, not %r" % (cls, type(thing),))
+			raise TypeError("Thing is required to be %r, not %r" % (cls, type(thing),))
 		return thing
 
 	def __init__(self, *terms, title=None):
