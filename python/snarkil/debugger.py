@@ -9,19 +9,19 @@ def eprint(*args, **kwargs):
 
 
 def print_constriant(constraint, state, prefix="\t"):
-	eprint(prefix, "A", constraint.a.title or '')
+	eprint(prefix, "A =", constraint.a.evaluate(state), constraint.a.title or '')
 	for term in constraint.a.terms:
 		eprint(prefix, "\t$%r * %r = %r" % (term.var.idx, term.coeff, term.evaluate(state)))
 		eprint(prefix, "\t\tvalue of %r is %r (negative of %r)" % (term.var.idx, state.value(term.var), -state.value(term.var)))
 	eprint()
 
-	eprint(prefix, "B", constraint.b.title or '')
+	eprint(prefix, "B =", constraint.b.evaluate(state), constraint.b.title or '')
 	for term in constraint.b.terms:
 		eprint(prefix, "\t$%r * %r = %r" % (term.var.idx, term.coeff, term.evaluate(state)))
 		eprint(prefix, "\t\tvalue of %r is %r (negative of %r)" % (term.var.idx, state.value(term.var), -state.value(term.var)))
 	eprint()
 
-	eprint(prefix, "C", constraint.c.title or '')
+	eprint(prefix, "C =", constraint.c.evaluate(state), constraint.c.title or '')
 	for term in constraint.c.terms:
 		eprint(prefix, "\t$%r * %r = %r" % (term.var.idx, term.coeff, term.evaluate(state)))
 		eprint(prefix, "\t\tvalue of %r is %r (negative of %r)" % (term.var.idx, state.value(term.var), -state.value(term.var)))
@@ -51,8 +51,9 @@ class Debugger(object):
 		if constraints:
 			eprint("\tconstraints:")
 			for i, const in enumerate(constraints):
-				eprint('\t', i, const.valid(state))
+				eprint('\t', i, const.valid(state), const.title or '')
 				print_constriant(const, state, "\t\t")
+
 		eprint()
 
 	def trace(self):
@@ -74,7 +75,6 @@ def debugger_main(argv):
 		inputs = Program.parse_inputs(input_handle)
 
 	program.setup()
-
 	program.set_values(inputs)
 
 	obj = Debugger(program)

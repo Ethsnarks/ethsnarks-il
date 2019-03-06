@@ -34,7 +34,7 @@ git-pull:
 clean: test-circuits-clean
 	rm -rf .build
 
-test: test-circuits
+test: test-circuits-clean test-parser test-circuits test-debugger
 
 test-parser:
 	@for circuit_file in tests/circuits/*.circuit; do \

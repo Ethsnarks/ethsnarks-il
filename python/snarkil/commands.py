@@ -452,7 +452,8 @@ class TableCommand(AbstractCommand):
         # Map number of input bits onto the classes which implement the constraints
         table_classes = {
             1: TableCommand1bit,
-            2: TableCommand2bit
+            2: TableCommand2bit,
+            3: TableCommand3bit
         }
         n_bits = len(stmt.in_vars)
         if n_bits not in table_classes:
@@ -486,10 +487,12 @@ class TableCommand1bit(TableCommand):
         one = state.ONE
         b = state[self.inputs[0]]  # input bit
         r = state[self.outputs[0]] # result
-        a = state.constant(self.lut[0])
 
+        # Linear combination to select from lookup table
+        a = state.constant(self.lut[0])
         a += (b*self.lut[1])
         a -= (b*self.lut[0])
+
         return [Constraint(a, one, r)]
 
 
@@ -506,6 +509,58 @@ class TableCommand2bit(TableCommand):
         rhs = state.constant(-c[0]) + r + Term(b[1], -c[2] + c[0])
 
         return [Constraint(lhs, b[0], rhs)]
+
+
+class TableCommand3bit(AbstractCommand):
+    __slots__ = ('lut', 'mux_a', 'mux_b')
+    def __init__(self, lut, in_vars, out_vars):
+        super(TableCommand3bit, self).__init__(in_vars, out_vars)
+        self.lut = lut
+
+    def as_statement(self):
+        return TableStatement(self.lut, self.inputs, self.outputs)
+
+    def setup(self, state):
+        self.aux = []
+
+        half = len(self.lut) // 2
+
+        self.aux.append(state.var_new()) # aux 0
+        self.mux_a = TableCommand2bit(self.lut[:half], self.inputs[:-1], [self.aux[-1]])
+
+        self.aux.append(state.var_new()) # aux 1
+        self.mux_b = TableCommand2bit(self.lut[half:], self.inputs[:-1], [self.aux[-1]])
+
+        self.aux.append(state.var_new()) # aux 2
+        self.aux.append(state.var_new()) # aux 3
+
+        state.lc_create(self.aux[2] + self.aux[3], self.outputs[0])
+
+    def evaluate(self, state):
+        self.mux_a.evaluate(state)
+        aux_0 = state.value(self.aux[0])
+
+        self.mux_b.evaluate(state)
+        aux_1 = state.value(self.aux[1])
+
+        b = state.value(self.inputs[-1])
+        state.var_value_set(self.aux[2], ((1-b)*aux_0))
+        state.var_value_set(self.aux[3], (b*aux_1))
+
+    def constraints(self, state):
+        ret = list()
+        ret += self.mux_a.constraints(state)
+        ret += self.mux_b.constraints(state)
+
+        # Then selector to choose the first or second auxilliary output depending on the third bit
+        b = state[self.inputs[-1]]
+        aux = [state[_] for _ in self.aux]
+        ret += [
+            Constraint(aux[0], state.ONE - b, aux[2]),
+            Constraint(aux[1], b, aux[3]),
+        ]
+
+        return ret
 
 
 COMMANDS = {

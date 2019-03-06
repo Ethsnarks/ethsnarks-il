@@ -249,14 +249,17 @@ class Combination(object):
 
 
 class Constraint(object):
+	__slots__ = ('a', 'b', 'c', 'title')
+
 	"""
 	Of the form `((A * B) - C) == 0`
 	Where each of A, B and C are linear combinations
 	"""
-	def __init__(self, alpha, bravo, charlie):
+	def __init__(self, alpha, bravo, charlie, title=None):
 		self.a = Combination.coerce(alpha)
 		self.b = Combination.coerce(bravo)
 		self.c = Combination.coerce(charlie)
+		self.title = title
 
 	def valid(self, state):
 		a = self.a.evaluate(state)
