@@ -311,7 +311,7 @@ class AssertCommand(AbstractCommand):
             raise RuntimeError("Assertion failed!")
 
     def constraints(self, state):
-        return [Constraint(a, b, c)]
+        return [Constraint(self.inputs[0], self.inputs[1], self.outputs[0])]
 
 
 class PackCommand(AbstractCommand):

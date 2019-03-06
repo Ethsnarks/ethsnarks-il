@@ -189,20 +189,33 @@ class Term(object):
 class Combination(object):
 	__slots__ = ('terms', 'title')
 
+	@classmethod
+	def coerce(cls, thing):
+		"""
+		We require a linear Combination, but the input may not be one.
+		"""
+		if isinstance(thing, Variable):
+			thing = Term(thing)
+		if isinstance(thing, Term):
+			thing = cls(thing)
+		if not isinstance(thing, cls):
+			raise TypeError("Thign is required to be %r, not %r" % (cls, type(thing),))
+		return thing
+
 	def __init__(self, *terms, title=None):
 		self.terms = terms
 		self.title = title
 
 	def evaluate(self, state):
 		assert isinstance(state, State)
-		return reduce(operator.add, [term.evaluate(state) for term in self.terms])
+		return reduce(operator.add, (term.evaluate(state) for term in self.terms))
 
 	def __iter__(self):
 		return iter(self.terms)
 
 	def __mul__(self, other):
 		# Multiply by constant
-		return Combination(*[term * other for term in self.terms])
+		return Combination(*(term * other for term in self.terms))
 
 	def __add__(self, other):
 		if isinstance(other, Combination):
@@ -219,7 +232,7 @@ class Combination(object):
 		return self + other_neg
 
 	def __neg__(self):
-		return Combination(*[-term for term in self.terms])
+		return Combination(*(-term for term in self.terms))
 
 
 class Constraint(object):
@@ -228,27 +241,9 @@ class Constraint(object):
 	Where each of A, B and C are linear combinations
 	"""
 	def __init__(self, alpha, bravo, charlie):
-		if isinstance(alpha, Variable):
-			alpha = Term(alpha)
-		if isinstance(bravo, Variable):
-			bravo = Term(bravo)
-		if isinstance(charlie, Variable):
-			charlie = Term(charlie)
-		if isinstance(alpha, Term):
-			alpha = Combination(alpha)
-		if isinstance(bravo, Term):
-			bravo = Combination(bravo)
-		if isinstance(charlie, Term):
-			charlie = Combination(charlie)
-		if not isinstance(alpha, Combination):
-			raise TypeError("A required to be LinearCombination, not %r" % (type(alpha),))
-		if not isinstance(bravo, Combination):
-			raise TypeError("B required to be LinearCombination, not %r" % (type(bravo),))
-		if not isinstance(charlie, Combination):
-			raise TypeError("C required to be LinearCombination, not %r" % (type(charlie),))
-		self.a = alpha
-		self.b = bravo
-		self.c = charlie
+		self.a = Combination.coerce(alpha)
+		self.b = Combination.coerce(bravo)
+		self.c = Combination.coerce(charlie)
 
 	def valid(self, state):
 		a = self.a.evaluate(state)

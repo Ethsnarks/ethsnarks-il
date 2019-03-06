@@ -40,7 +40,13 @@ test-parser:
 	@for circuit_file in tests/circuits/*.circuit; do \
 		echo "# Parsing $$circuit_file"; \
 		PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.parser $$circuit_file; \
-		PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.program $$circuit_file `echo $$circuit_file | cut -f 1 -d '.'`.input; \
+		echo ""; \
+	done
+
+test-debugger:
+	@for circuit_file in tests/circuits/*.circuit; do \
+		echo "# Debugging $$circuit_file"; \
+		PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.debugger $$circuit_file `echo $$circuit_file | cut -f 1 -d '.'`.input; \
 		echo ""; \
 	done
 
@@ -51,7 +57,7 @@ test-circuits-clean:
 
 # Perform circuit file tests using Python implementation
 $(CIRCUIT_TESTS_DIR)/%.result-py: $(CIRCUIT_TESTS_DIR)/%.circuit $(CIRCUIT_TESTS_DIR)/%.test $(CIRCUIT_TESTS_DIR)/%.input
-	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.program eval $< $(basename $<).input > $@
+	PYTHONPATH=$(PYTHONPATH) $(PYTHON) -msnarkil.program $< $(basename $<).input > $@
 	diff -ru $(basename $<).test $@ || rm $@
 
 # Perform circuit file tests using C++ implementation

@@ -1,4 +1,3 @@
-from __future__ import print_function
 import re
 import sys
 from collections import OrderedDict
@@ -10,32 +9,8 @@ from .parser import parse, VariableCount, VariableDeclaration
 from .r1cs import State, Constraint
 
 
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
-
-
 class ProgramError(Exception):
 	pass
-
-
-def print_constriant(constraint, state, prefix="\t"):
-	eprint(prefix, "A", constraint.a.title or '')
-	for term in constraint.a.terms:
-		eprint(prefix, "\t", term.var.idx, '*', term.coeff)
-		eprint(prefix, "\tvalue of ", term.var.idx, 'is', state.value(term.var), '(negative of', -state.value(term.var), ')')
-	eprint()
-
-	eprint(prefix, "B", constraint.b.title or '')
-	for term in constraint.b.terms:
-		eprint(prefix, "\t", term.var.idx, '*', term.coeff)
-		eprint(prefix, "\tvalue of ", term.var.idx, 'is', state.value(term.var), '(negative of', -state.value(term.var), ')')
-	eprint()
-
-	eprint(prefix, "C", constraint.c.title or '')
-	for term in constraint.c.terms:
-		eprint(prefix, "\t", term.var.idx, '*', term.coeff)
-		eprint(prefix, "\tvalue of ", term.var.idx, 'is', state.value(term.var), '(negative of', -state.value(term.var), ')')
-	eprint()
 
 
 class Program(object):
@@ -93,27 +68,6 @@ class Program(object):
 		for cmd in self.commands:
 			cmd.setup(self.state)
 
-	def trace(self):
-		for cmd in self.commands:
-			cmd.evaluate(self.state)
-			# Then display the command, and all inputs/outputs/auxvars
-			stmt = cmd.as_statement()
-			eprint(stmt.as_line())
-			for idx, val in [(_, self.state.value(_)) for _ in cmd.inputs]:
-				eprint("\tin", idx, "=", val)
-			for idx, val in [(_, self.state.value(_)) for _ in cmd.outputs]:
-				eprint("\tout", idx, "=", val)
-			if cmd.aux:
-				for idx, val in [(_, self.state.value(_)) for _ in cmd.aux]:
-					eprint("\taux", idx, "=", val)
-			constraints = cmd.constraints(self.state)
-			if constraints:
-				eprint("\tconstraints:")
-				for i, const in enumerate(constraints):
-					eprint('\t', i)
-					print_constriant(const, self.state, "\t\t")
-			eprint()
-
 	def run(self):
 		for cmd in self.commands:
 			cmd.evaluate(self.state)
@@ -144,32 +98,21 @@ class Program(object):
 
 def program_main(argv):
 	if len(argv) < 3:
-		print("Usage: %s <eval|trace> <file.circuit> <file.input>" % (argv[0],))
+		print("Usage: %s <file.circuit> <file.input>" % (argv[0],))
 		return 1
 
-	cmd = argv[1]
-	ok_cmds = ['eval', 'trace']
-	if cmd not in ok_cmds:
-		print("Error: command must be one of:", ok_cmds)
-		return 2
-
-	with open(argv[3], 'r') as input_handle:
-		inputs = Program.parse_inputs(input_handle)
-
-	with open(argv[2], 'r') as circuit_handle:
+	with open(argv[1], 'r') as circuit_handle:
 		program = Program.from_lines(circuit_handle)
 
+	with open(argv[2], 'r') as input_handle:
+		inputs = Program.parse_inputs(input_handle)
+
+	# Setup then run program with given inputs
 	program.setup()
-
 	program.set_values(inputs)
+	program.run()
 
-	if cmd == 'trace':
-		program.trace()
-	elif cmd == 'eval':
-		program.run()
-	else:
-		raise RuntimeError('Unknown mode!')
-
+	# Display program outputs on console
 	for idx in program.outputs:
 		value = program.value(idx)
 		print("%s=%s" % (str(idx), str(value)))
