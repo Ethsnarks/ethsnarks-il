@@ -437,6 +437,17 @@ class TableCommand(AbstractCommand):
         return TableStatement(self.lut, self.inputs, self.outputs)
 
     @classmethod
+    def cls_for_n_inputs(cls, n_bits, stmt=None, line=None):
+        if n_bits > 2:
+            return TableCommandNbit
+        elif n_bits == 2:
+            return TableCommand2bit
+        elif n_bits == 1:
+            return TableCommand1bit
+        else:
+            raise InvalidCommandError('Unsupported table with %d bits' % (n_bits,), stmt, line)
+
+    @classmethod
     def from_statement(cls, stmt, line):
         if not isinstance(stmt, TableStatement):
             raise InvalidCommandError('Must be TableStatement', stmt, line)
@@ -449,16 +460,7 @@ class TableCommand(AbstractCommand):
         if len(stmt.lut) != lut_n_expected:
             raise InvalidCommandError("Lookup table count mismatch, expected %d, got %d" % (lut_n_expected, len(lut)), stmt, line)
 
-        # Map number of input bits onto the classes which implement the constraints
-        table_classes = {
-            1: TableCommand1bit,
-            2: TableCommand2bit,
-            3: TableCommand3bit
-        }
-        n_bits = len(stmt.in_vars)
-        if n_bits not in table_classes:
-            raise InvalidCommandError('Unsupported table with %d bits' % (n_bits,), stmt, line)
-        sub_cls = table_classes[len(stmt.in_vars)]
+        sub_cls = cls.cls_for_n_inputs(len(stmt.in_vars), stmt, line)
 
         lut = [FQ(int(_)) for _ in stmt.lut]
         return sub_cls(lut, stmt.in_vars, stmt.out_vars)
@@ -503,18 +505,20 @@ class TableCommand2bit(TableCommand):
         r = state[self.outputs[0]]
 
         # lhs = c[1] - c[0] + (b[1] * (c[3] - c[2] - c[1] + c[0]))
-        lhs = state.constant(c[1] - c[0]) + Term(b[1], c[3] - c[2] - c[1] + c[0])
+        lhs_bit = b[1] * (c[3] - c[2] - c[1] + c[0])
+        lhs = state.constant(c[1] - c[0]) + lhs_bit
 
         # rhs = -c[0] + r + (b[1] * (-c[2] + c[0]))
-        rhs = state.constant(-c[0]) + r + Term(b[1], -c[2] + c[0])
+        rhs_bit = b[1] * (-c[2] + c[0])
+        rhs = state.constant(-c[0]) + r + rhs_bit
 
         return [Constraint(lhs, b[0], rhs)]
 
 
-class TableCommand3bit(AbstractCommand):
+class TableCommandNbit(AbstractCommand):
     __slots__ = ('lut', 'mux_a', 'mux_b')
     def __init__(self, lut, in_vars, out_vars):
-        super(TableCommand3bit, self).__init__(in_vars, out_vars)
+        super(TableCommandNbit, self).__init__(in_vars, out_vars)
         self.lut = lut
 
     def as_statement(self):
@@ -524,12 +528,16 @@ class TableCommand3bit(AbstractCommand):
         self.aux = []
 
         half = len(self.lut) // 2
+        assert (len(self.lut) % half) == 0
+
+        # This allows for recursive construction for any number of inputs
+        sub_cls = TableCommand.cls_for_n_inputs(len(self.inputs) - 1)
 
         self.aux.append(state.var_new()) # aux 0
-        self.mux_a = TableCommand2bit(self.lut[:half], self.inputs[:-1], [self.aux[-1]])
+        self.mux_a = sub_cls(self.lut[:half], self.inputs[:-1], [self.aux[-1]])
 
         self.aux.append(state.var_new()) # aux 1
-        self.mux_b = TableCommand2bit(self.lut[half:], self.inputs[:-1], [self.aux[-1]])
+        self.mux_b = sub_cls(self.lut[half:], self.inputs[:-1], [self.aux[-1]])
 
         self.aux.append(state.var_new()) # aux 2
         self.aux.append(state.var_new()) # aux 3
